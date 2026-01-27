@@ -276,6 +276,12 @@ function getAppHtml(): string {
       const [loadingLeads, setLoadingLeads] = useState(false);
       const [dateFilter, setDateFilter] = useState('all');
       const [expandedLead, setExpandedLead] = useState(null);
+      // Create form state
+      const [view, setView] = useState('leads'); // 'leads' or 'create'
+      const [createFormData, setCreateFormData] = useState({ name: '', form_type: 'landing', description: '', status: 'active' });
+      const [creating, setCreating] = useState(false);
+      const [createError, setCreateError] = useState(null);
+      const [createSuccess, setCreateSuccess] = useState(false);
 
       useEffect(() => {
         fetchForms();
@@ -317,6 +323,43 @@ function getAppHtml(): string {
         }
       };
 
+      const createForm = async (e) => {
+        e.preventDefault();
+        if (!createFormData.name.trim()) return;
+        setCreating(true);
+        setCreateError(null);
+        setCreateSuccess(false);
+        try {
+          const res = await fetch(API_URL + '/api/v1/forms', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'AppId': API_KEY,
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(createFormData)
+          });
+          if (res.status === 401) { logout(); return; }
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || err.error || 'Failed to create form');
+          }
+          const data = await res.json();
+          setCreateSuccess(true);
+          setCreateFormData({ name: '', form_type: 'landing', description: '', status: 'active' });
+          // Refresh forms list and switch to leads view
+          await fetchForms();
+          setTimeout(() => {
+            setView('leads');
+            setCreateSuccess(false);
+          }, 1500);
+        } catch (err) {
+          setCreateError(err.message);
+        } finally {
+          setCreating(false);
+        }
+      };
+
       // Filter leads by date
       const filterConfig = DATE_FILTERS.find(f => f.key === dateFilter);
       const filterStart = filterConfig?.getStart();
@@ -344,18 +387,152 @@ function getAppHtml(): string {
 
       return h('div', { style: { minHeight: '100vh', background: '#f5f5f5' } },
         // Header
-        h('header', { style: { background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
-            h('span', { style: { fontSize: '24px' } }, '📋'),
-            h('h1', { style: { fontSize: '20px', fontWeight: 600, color: '#1f2937' } }, 'Website Leads')
+        h('header', { style: { background: 'white', borderBottom: '1px solid #e5e7eb', padding: '0 24px' } },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '64px' } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+              h('span', { style: { fontSize: '24px' } }, '📋'),
+              h('h1', { style: { fontSize: '20px', fontWeight: 600, color: '#1f2937' } }, '23blocks Forms')
+            ),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px' } },
+              h('span', { style: { fontSize: '14px', color: '#6b7280' } }, user?.email),
+              h('button', { onClick: logout, style: { padding: '8px 16px', fontSize: '14px', color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer' } }, 'Logout')
+            )
           ),
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px' } },
-            h('span', { style: { fontSize: '14px', color: '#6b7280' } }, user?.email),
-            h('button', { onClick: logout, style: { padding: '8px 16px', fontSize: '14px', color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer' } }, 'Logout')
+          // Navigation tabs
+          h('div', { style: { display: 'flex', gap: '8px', paddingBottom: '0' } },
+            h('button', {
+              onClick: () => setView('leads'),
+              style: {
+                padding: '12px 20px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: view === 'leads' ? '#667eea' : '#6b7280',
+                background: 'none',
+                border: 'none',
+                borderBottom: view === 'leads' ? '2px solid #667eea' : '2px solid transparent',
+                cursor: 'pointer',
+                marginBottom: '-1px'
+              }
+            }, '📬 Website Leads'),
+            h('button', {
+              onClick: () => setView('create'),
+              style: {
+                padding: '12px 20px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: view === 'create' ? '#667eea' : '#6b7280',
+                background: 'none',
+                border: 'none',
+                borderBottom: view === 'create' ? '2px solid #667eea' : '2px solid transparent',
+                cursor: 'pointer',
+                marginBottom: '-1px'
+              }
+            }, '✨ Create Form')
           )
         ),
         // Content
-        h('div', { style: { display: 'flex', height: 'calc(100vh - 65px)' } },
+        view === 'create'
+          // Create Form View
+          ? h('div', { style: { padding: '32px', maxWidth: '600px', margin: '0 auto' } },
+              h('div', { style: { background: 'white', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' } },
+                h('h2', { style: { fontSize: '24px', fontWeight: 600, color: '#1f2937', marginBottom: '8px' } }, 'Create New Form'),
+                h('p', { style: { color: '#6b7280', marginBottom: '24px' } }, 'Set up a new form to collect data from your website'),
+                createSuccess && h('div', { style: { background: '#d1fae5', border: '1px solid #a7f3d0', color: '#065f46', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' } },
+                  h('span', null, '✓'),
+                  'Form created successfully!'
+                ),
+                createError && h('div', { style: { background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' } }, createError),
+                h('form', { onSubmit: createForm },
+                  h('div', { style: { marginBottom: '20px' } },
+                    h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Form Name *'),
+                    h('input', {
+                      type: 'text',
+                      value: createFormData.name,
+                      onChange: e => setCreateFormData({ ...createFormData, name: e.target.value }),
+                      placeholder: 'e.g., Contact Form, Newsletter Signup',
+                      required: true,
+                      disabled: creating,
+                      style: { width: '100%', padding: '12px 16px', fontSize: '15px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none' }
+                    })
+                  ),
+                  h('div', { style: { marginBottom: '20px' } },
+                    h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Form Type'),
+                    h('select', {
+                      value: createFormData.form_type,
+                      onChange: e => setCreateFormData({ ...createFormData, form_type: e.target.value }),
+                      disabled: creating,
+                      style: { width: '100%', padding: '12px 16px', fontSize: '15px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none', background: 'white' }
+                    },
+                      h('option', { value: 'landing' }, '📬 Landing Form - Collect leads from website'),
+                      h('option', { value: 'survey' }, '📊 Survey - Gather feedback and opinions'),
+                      h('option', { value: 'appointment' }, '📅 Appointment - Schedule bookings'),
+                      h('option', { value: 'app_form' }, '📋 App Form - Internal application forms')
+                    )
+                  ),
+                  h('div', { style: { marginBottom: '20px' } },
+                    h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Description'),
+                    h('textarea', {
+                      value: createFormData.description,
+                      onChange: e => setCreateFormData({ ...createFormData, description: e.target.value }),
+                      placeholder: 'Brief description of what this form is for...',
+                      disabled: creating,
+                      rows: 3,
+                      style: { width: '100%', padding: '12px 16px', fontSize: '15px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none', resize: 'vertical' }
+                    })
+                  ),
+                  h('div', { style: { marginBottom: '24px' } },
+                    h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Status'),
+                    h('div', { style: { display: 'flex', gap: '12px' } },
+                      h('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' } },
+                        h('input', {
+                          type: 'radio',
+                          name: 'status',
+                          value: 'active',
+                          checked: createFormData.status === 'active',
+                          onChange: e => setCreateFormData({ ...createFormData, status: e.target.value }),
+                          disabled: creating
+                        }),
+                        h('span', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+                          h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' } }),
+                          'Active'
+                        )
+                      ),
+                      h('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' } },
+                        h('input', {
+                          type: 'radio',
+                          name: 'status',
+                          value: 'draft',
+                          checked: createFormData.status === 'draft',
+                          onChange: e => setCreateFormData({ ...createFormData, status: e.target.value }),
+                          disabled: creating
+                        }),
+                        h('span', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+                          h('span', { style: { width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' } }),
+                          'Draft'
+                        )
+                      )
+                    )
+                  ),
+                  h('button', {
+                    type: 'submit',
+                    disabled: creating || !createFormData.name.trim(),
+                    style: {
+                      width: '100%',
+                      padding: '14px',
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: 'white',
+                      background: creating ? '#a5b4fc' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: creating ? 'not-allowed' : 'pointer'
+                    }
+                  }, creating ? 'Creating...' : 'Create Form')
+                )
+              )
+            )
+          // Leads View
+          : h('div', { style: { display: 'flex', height: 'calc(100vh - 113px)' } },
           // Forms List
           h('div', { style: { width: '300px', background: 'white', borderRight: '1px solid #e5e7eb', overflow: 'auto' } },
             h('div', { style: { padding: '16px', borderBottom: '1px solid #e5e7eb', fontWeight: 600, fontSize: '14px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Your Forms'),
