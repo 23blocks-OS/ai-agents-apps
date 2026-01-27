@@ -2,18 +2,23 @@
  * 23blocks Forms App - MCP Server
  *
  * Provides interactive UIs for Forms Block:
+ * - Login & Authentication
  * - Forms Dashboard
- * - Survey Builder
- * - Submissions Viewer
- * - Analytics Dashboard
+ * - Create Form
+ * - View Form Instances (submissions)
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { validateEnvVars } from "@23blocks/mcp-utils";
 
-// Validate environment
-const env = validateEnvVars();
+// Get environment variables
+const API_URL = process.env.BLOCKS_API_URL || '';
+const API_KEY = process.env.BLOCKS_API_KEY || '';
+
+if (!API_URL || !API_KEY) {
+  console.error("ERROR: Missing BLOCKS_API_URL or BLOCKS_API_KEY environment variables");
+  process.exit(1);
+}
 
 // Create MCP server
 const server = new McpServer({
@@ -24,7 +29,7 @@ const server = new McpServer({
 // Tool: Forms Dashboard
 server.tool(
   "forms_dashboard",
-  "Open the forms management dashboard to view and manage all forms",
+  "Open the forms management dashboard with login. Lists all forms and allows creating new ones.",
   {
     type: "object",
     properties: {}
@@ -32,51 +37,37 @@ server.tool(
   async () => {
     return {
       content: [{ type: "text", text: "Opening Forms Dashboard..." }],
-      _meta: { ui: { resourceUri: "ui://forms/dashboard" } }
+      _meta: { ui: { resourceUri: "ui://forms/app" } }
     };
   }
 );
 
-// Tool: Survey Builder
+// Tool: Create Form
 server.tool(
-  "survey_builder",
-  "Open the interactive survey builder to create or edit surveys",
+  "create_form",
+  "Open the form creation interface to create a new form",
   {
     type: "object",
-    properties: {
-      survey_id: {
-        type: "string",
-        description: "Optional survey ID to edit existing survey"
-      }
-    }
+    properties: {}
   },
-  async (args) => {
-    const surveyId = (args as { survey_id?: string }).survey_id;
-    const action = surveyId ? `Editing survey ${surveyId}` : "Creating new survey";
-
+  async () => {
     return {
-      content: [{ type: "text", text: `${action}...` }],
-      _meta: {
-        ui: {
-          resourceUri: surveyId
-            ? `ui://forms/survey-builder?id=${surveyId}`
-            : "ui://forms/survey-builder"
-        }
-      }
+      content: [{ type: "text", text: "Opening Form Creator..." }],
+      _meta: { ui: { resourceUri: "ui://forms/app?view=create" } }
     };
   }
 );
 
-// Tool: View Submissions
+// Tool: View Form Instances
 server.tool(
-  "form_submissions",
-  "View submissions for a specific form with filtering and export options",
+  "form_instances",
+  "View all submitted instances (responses) for a specific form",
   {
     type: "object",
     properties: {
       form_id: {
         type: "string",
-        description: "Form ID to view submissions for"
+        description: "Form ID to view instances for"
       }
     },
     required: ["form_id"]
@@ -85,62 +76,21 @@ server.tool(
     const formId = (args as { form_id: string }).form_id;
 
     return {
-      content: [{ type: "text", text: `Loading submissions for form ${formId}...` }],
-      _meta: { ui: { resourceUri: `ui://forms/submissions?form_id=${formId}` } }
+      content: [{ type: "text", text: `Loading instances for form ${formId}...` }],
+      _meta: { ui: { resourceUri: `ui://forms/app?view=instances&form_id=${formId}` } }
     };
   }
 );
 
-// Tool: Forms Analytics
-server.tool(
-  "forms_analytics",
-  "View analytics and insights for forms performance",
-  {
-    type: "object",
-    properties: {
-      form_id: {
-        type: "string",
-        description: "Optional form ID for specific form analytics"
-      }
-    }
-  },
-  async (args) => {
-    const formId = (args as { form_id?: string }).form_id;
-
-    return {
-      content: [{ type: "text", text: "Loading Forms Analytics..." }],
-      _meta: {
-        ui: {
-          resourceUri: formId
-            ? `ui://forms/analytics?form_id=${formId}`
-            : "ui://forms/analytics"
-        }
-      }
-    };
-  }
-);
-
-// UI Resources
+// Main UI Resource - serves the React app with config injected
 server.resource(
-  "ui://forms/dashboard",
-  "Forms management dashboard",
+  "ui://forms/app",
+  "Forms management application",
   async () => ({
     contents: [{
-      uri: "ui://forms/dashboard",
+      uri: "ui://forms/app",
       mimeType: "text/html",
-      text: getDashboardHtml()
-    }]
-  })
-);
-
-server.resource(
-  "ui://forms/survey-builder",
-  "Interactive survey builder",
-  async () => ({
-    contents: [{
-      uri: "ui://forms/survey-builder",
-      mimeType: "text/html",
-      text: getSurveyBuilderHtml()
+      text: getAppHtml()
     }]
   })
 );
@@ -154,231 +104,270 @@ async function main() {
 
 main().catch(console.error);
 
-// HTML Templates (will be replaced with bundled React app in production)
-
-function getDashboardHtml(): string {
+// HTML template with injected config
+function getAppHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forms Dashboard</title>
+  <title>23blocks Forms</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f5f5f5;
       min-height: 100vh;
-      padding: 24px;
     }
-    .header {
-      background: white;
-      padding: 20px 24px;
-      border-radius: 12px;
-      margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .header h1 { color: #333; font-size: 24px; }
-    .header p { color: #666; margin-top: 4px; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    }
-    .card h3 { color: #333; margin-bottom: 8px; }
-    .card p { color: #666; font-size: 14px; }
-    .stat {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #eee;
-    }
-    .stat-item { text-align: center; }
-    .stat-value { font-size: 24px; font-weight: 600; color: #0066cc; }
-    .stat-label { font-size: 12px; color: #999; }
-    .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 500;
-    }
-    .badge-active { background: #d4edda; color: #155724; }
-    .badge-draft { background: #fff3cd; color: #856404; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Forms Dashboard</h1>
-    <p>Manage your forms, surveys, and appointments</p>
-  </div>
-  <div class="grid">
-    <div class="card" onclick="openSurveyBuilder()">
-      <span class="badge badge-active">Active</span>
-      <h3>Customer Feedback Survey</h3>
-      <p>NPS and satisfaction questions</p>
-      <div class="stat">
-        <div class="stat-item">
-          <div class="stat-value">342</div>
-          <div class="stat-label">Responses</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">78%</div>
-          <div class="stat-label">Completion</div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <span class="badge badge-active">Active</span>
-      <h3>Contact Form</h3>
-      <p>Website contact requests</p>
-      <div class="stat">
-        <div class="stat-item">
-          <div class="stat-value">89</div>
-          <div class="stat-label">This Week</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">4.2h</div>
-          <div class="stat-label">Avg Response</div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <span class="badge badge-draft">Draft</span>
-      <h3>Employee Onboarding</h3>
-      <p>New hire information form</p>
-      <div class="stat">
-        <div class="stat-item">
-          <div class="stat-value">0</div>
-          <div class="stat-label">Responses</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">--</div>
-          <div class="stat-label">Completion</div>
-        </div>
-      </div>
-    </div>
-  </div>
   <script>
-    function openSurveyBuilder() {
-      window.parent.postMessage({
-        type: 'mcp-message',
-        payload: { action: 'navigate', target: 'survey-builder', id: 'survey-1' }
-      }, '*');
-    }
+    // Inject API configuration from server
+    window.__BLOCKS_API_URL__ = "${API_URL}";
+    window.__BLOCKS_API_KEY__ = "${API_KEY}";
   </script>
-</body>
-</html>`;
-}
-
-function getSurveyBuilderHtml(): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Survey Builder</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
-      min-height: 100vh;
-    }
-    .toolbar {
-      background: white;
-      padding: 12px 24px;
-      border-bottom: 1px solid #e0e0e0;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .toolbar h2 { flex: 1; font-size: 18px; }
-    .btn {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .btn-primary { background: #0066cc; color: white; }
-    .btn-secondary { background: #e0e0e0; color: #333; }
-    .content {
-      display: flex;
-      height: calc(100vh - 53px);
-    }
-    .sidebar {
-      width: 280px;
-      background: white;
-      border-right: 1px solid #e0e0e0;
-      padding: 16px;
-    }
-    .sidebar h3 { font-size: 14px; color: #666; margin-bottom: 12px; }
-    .field-type {
-      padding: 12px;
-      background: #f8f8f8;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      cursor: grab;
-    }
-    .canvas {
-      flex: 1;
-      padding: 24px;
-      overflow: auto;
-    }
-    .question {
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .question input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 16px;
-    }
-  </style>
 </head>
 <body>
-  <div class="toolbar">
-    <h2>Survey Builder</h2>
-    <button class="btn btn-secondary">Preview</button>
-    <button class="btn btn-primary">Save & Publish</button>
-  </div>
-  <div class="content">
-    <div class="sidebar">
-      <h3>Add Question</h3>
-      <div class="field-type">Text Input</div>
-      <div class="field-type">Multiple Choice</div>
-      <div class="field-type">Rating Scale</div>
-      <div class="field-type">Dropdown</div>
-      <div class="field-type">Date Picker</div>
-    </div>
-    <div class="canvas">
-      <div class="question">
-        <input type="text" placeholder="Enter question text..." value="How satisfied are you with our service?">
-      </div>
-      <div class="question">
-        <input type="text" placeholder="Enter question text..." value="Would you recommend us to others?">
+  <div id="root">
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
+      <div style="text-align:center;">
+        <div style="width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#667eea;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+        <p style="color:#6b7280;">Loading...</p>
       </div>
     </div>
   </div>
+  <script type="module">
+    // Simple standalone app - no build step needed for now
+    const { createElement: h, useState, useEffect, useCallback, useContext, createContext } = await import('https://esm.sh/react@18');
+    const { createRoot } = await import('https://esm.sh/react-dom@18/client');
+
+    const API_URL = window.__BLOCKS_API_URL__;
+    const API_KEY = window.__BLOCKS_API_KEY__;
+
+    // Auth Context
+    const AuthContext = createContext(null);
+
+    function AuthProvider({ children }) {
+      const [state, setState] = useState({
+        token: null,
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+
+      const login = useCallback(async (email, password) => {
+        setState(s => ({ ...s, isLoading: true, error: null }));
+        try {
+          const res = await fetch(API_URL + '/api/v1/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'AppId': API_KEY },
+            body: JSON.stringify({ email, password }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || err.error || 'Login failed');
+          }
+          const data = await res.json();
+          const token = data.token || data.access_token || data.data?.token;
+          const user = data.user || data.data?.user || { email };
+          setState({ token, user, isAuthenticated: true, isLoading: false, error: null });
+          return true;
+        } catch (err) {
+          setState(s => ({ ...s, isLoading: false, error: err.message }));
+          return false;
+        }
+      }, []);
+
+      const logout = useCallback(() => {
+        setState({ token: null, user: null, isAuthenticated: false, isLoading: false, error: null });
+      }, []);
+
+      return h(AuthContext.Provider, { value: { ...state, login, logout } }, children);
+    }
+
+    function useAuth() {
+      return useContext(AuthContext);
+    }
+
+    // Login Form
+    function LoginForm() {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const { login, isLoading, error } = useAuth();
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (email && password) await login(email, password);
+      };
+
+      return h('div', { style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '20px' } },
+        h('div', { style: { background: 'white', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' } },
+          h('div', { style: { textAlign: 'center', marginBottom: '32px' } },
+            h('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '📋'),
+            h('h1', { style: { fontSize: '24px', color: '#1a1a2e' } }, 'Forms Dashboard'),
+            h('p', { style: { color: '#6c757d', marginTop: '8px' } }, 'Sign in to manage your forms')
+          ),
+          h('form', { onSubmit: handleSubmit },
+            error && h('div', { style: { background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' } }, error),
+            h('div', { style: { marginBottom: '16px' } },
+              h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Email'),
+              h('input', { type: 'email', value: email, onChange: e => setEmail(e.target.value), placeholder: 'you@example.com', required: true, disabled: isLoading, style: { width: '100%', padding: '12px 16px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none' } })
+            ),
+            h('div', { style: { marginBottom: '24px' } },
+              h('label', { style: { display: 'block', fontSize: '14px', fontWeight: 500, color: '#374151', marginBottom: '6px' } }, 'Password'),
+              h('input', { type: 'password', value: password, onChange: e => setPassword(e.target.value), placeholder: '••••••••', required: true, disabled: isLoading, style: { width: '100%', padding: '12px 16px', fontSize: '16px', border: '1px solid #d1d5db', borderRadius: '8px', outline: 'none' } })
+            ),
+            h('button', { type: 'submit', disabled: isLoading, style: { width: '100%', padding: '14px', fontSize: '16px', fontWeight: 600, color: 'white', background: isLoading ? '#a5b4fc' : '#667eea', border: 'none', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer' } },
+              isLoading ? 'Signing in...' : 'Sign In'
+            )
+          )
+        )
+      );
+    }
+
+    // Dashboard
+    function Dashboard() {
+      const { token, user, logout } = useAuth();
+      const [forms, setForms] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [selectedForm, setSelectedForm] = useState(null);
+      const [instances, setInstances] = useState([]);
+      const [loadingInstances, setLoadingInstances] = useState(false);
+
+      useEffect(() => {
+        fetchForms();
+      }, [token]);
+
+      const fetchForms = async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(API_URL + '/api/v1/forms', {
+            headers: { 'AppId': API_KEY, 'Authorization': 'Bearer ' + token },
+          });
+          if (res.status === 401) { logout(); return; }
+          const data = await res.json();
+          setForms(data.data || data || []);
+        } catch (err) {
+          console.error('Failed to fetch forms:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const fetchInstances = async (formId) => {
+        setLoadingInstances(true);
+        setSelectedForm(formId);
+        try {
+          const res = await fetch(API_URL + '/api/v1/landing_forms?form_id=' + formId, {
+            headers: { 'AppId': API_KEY, 'Authorization': 'Bearer ' + token },
+          });
+          if (res.status === 401) { logout(); return; }
+          const data = await res.json();
+          setInstances(data.data || data || []);
+        } catch (err) {
+          console.error('Failed to fetch instances:', err);
+        } finally {
+          setLoadingInstances(false);
+        }
+      };
+
+      if (loading) {
+        return h('div', { style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+          h('div', { style: { textAlign: 'center' } },
+            h('div', { style: { width: '40px', height: '40px', border: '3px solid #e5e7eb', borderTopColor: '#667eea', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' } }),
+            h('p', { style: { color: '#6b7280' } }, 'Loading forms...')
+          )
+        );
+      }
+
+      return h('div', { style: { minHeight: '100vh', background: '#f5f5f5' } },
+        // Header
+        h('header', { style: { background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+            h('span', { style: { fontSize: '24px' } }, '📋'),
+            h('h1', { style: { fontSize: '20px', fontWeight: 600, color: '#1f2937' } }, 'Forms Dashboard')
+          ),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px' } },
+            h('span', { style: { fontSize: '14px', color: '#6b7280' } }, user?.email),
+            h('button', { onClick: logout, style: { padding: '8px 16px', fontSize: '14px', color: '#6b7280', background: '#f3f4f6', border: 'none', borderRadius: '6px', cursor: 'pointer' } }, 'Logout')
+          )
+        ),
+        // Content
+        h('div', { style: { display: 'flex', height: 'calc(100vh - 65px)' } },
+          // Forms List
+          h('div', { style: { width: '350px', background: 'white', borderRight: '1px solid #e5e7eb', overflow: 'auto' } },
+            h('div', { style: { padding: '16px', borderBottom: '1px solid #e5e7eb', fontWeight: 600 } }, 'Your Forms (' + forms.length + ')'),
+            forms.length === 0
+              ? h('div', { style: { padding: '40px', textAlign: 'center', color: '#6b7280' } },
+                  h('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '📝'),
+                  h('p', null, 'No forms yet')
+                )
+              : forms.map(form =>
+                  h('div', {
+                    key: form.id,
+                    onClick: () => fetchInstances(form.id),
+                    style: {
+                      padding: '16px',
+                      borderBottom: '1px solid #f3f4f6',
+                      cursor: 'pointer',
+                      background: selectedForm === form.id ? '#eef2ff' : 'white'
+                    }
+                  },
+                    h('div', { style: { fontWeight: 500, color: '#1f2937' } }, form.name),
+                    h('div', { style: { fontSize: '13px', color: '#6b7280', marginTop: '4px' } }, form.form_type || 'form')
+                  )
+                )
+          ),
+          // Instances Panel
+          h('div', { style: { flex: 1, overflow: 'auto', padding: '24px' } },
+            !selectedForm
+              ? h('div', { style: { textAlign: 'center', padding: '60px', color: '#6b7280' } },
+                  h('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '👈'),
+                  h('p', null, 'Select a form to view submissions')
+                )
+              : loadingInstances
+                ? h('div', { style: { textAlign: 'center', padding: '60px' } },
+                    h('div', { style: { width: '40px', height: '40px', border: '3px solid #e5e7eb', borderTopColor: '#667eea', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' } }),
+                    h('p', { style: { color: '#6b7280' } }, 'Loading submissions...')
+                  )
+                : h('div', null,
+                    h('h2', { style: { fontSize: '18px', fontWeight: 600, marginBottom: '16px' } }, 'Submissions (' + instances.length + ')'),
+                    instances.length === 0
+                      ? h('div', { style: { background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center', color: '#6b7280' } },
+                          h('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '📭'),
+                          h('p', null, 'No submissions yet')
+                        )
+                      : instances.map((inst, i) =>
+                          h('div', {
+                            key: inst.id || i,
+                            style: { background: 'white', borderRadius: '12px', padding: '16px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
+                          },
+                            h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '12px' } },
+                              h('span', { style: { fontWeight: 500 } }, '#' + (inst.id || i + 1)),
+                              h('span', { style: { fontSize: '13px', color: '#6b7280' } }, inst.created_at ? new Date(inst.created_at).toLocaleString() : '')
+                            ),
+                            h('pre', { style: { fontSize: '13px', background: '#f9fafb', padding: '12px', borderRadius: '8px', overflow: 'auto', maxHeight: '200px' } },
+                              JSON.stringify(inst.data || inst, null, 2)
+                            )
+                          )
+                        )
+                  )
+          )
+        )
+      );
+    }
+
+    // App
+    function App() {
+      const { isAuthenticated } = useAuth();
+      return isAuthenticated ? h(Dashboard) : h(LoginForm);
+    }
+
+    // Mount
+    const root = createRoot(document.getElementById('root'));
+    root.render(h(AuthProvider, null, h(App)));
+  </script>
 </body>
 </html>`;
 }
