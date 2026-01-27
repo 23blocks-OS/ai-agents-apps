@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "paths": {
+      "@23blocks/shared-ui": ["./packages/shared-ui/src"],
+      "@23blocks/api-client": ["./packages/api-client/src"],
+      "@23blocks/mcp-utils": ["./packages/mcp-utils/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build"]
+}
