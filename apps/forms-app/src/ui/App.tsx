@@ -176,6 +176,130 @@ function LoginForm() {
   );
 }
 
+// Lead Card with AI Action Buttons
+function LeadCard({ lead, index, formName }: { lead: Lead; index: number; formName: string }) {
+  const [showActions, setShowActions] = useState(false);
+
+  const leadSummary = () => {
+    const parts = [];
+    if (lead.data?.name) parts.push(`Name: ${lead.data.name}`);
+    if (lead.data?.email) parts.push(`Email: ${lead.data.email}`);
+    if (lead.data?.phone) parts.push(`Phone: ${lead.data.phone}`);
+    if (lead.data?.company) parts.push(`Company: ${lead.data.company}`);
+    if (lead.data?.message) parts.push(`Message: ${lead.data.message}`);
+    // Include any other fields
+    Object.entries(lead.data || {}).forEach(([key, value]) => {
+      if (!['name', 'email', 'phone', 'company', 'message'].includes(key) && value) {
+        parts.push(`${key}: ${value}`);
+      }
+    });
+    return parts.join('\n');
+  };
+
+  const handleAction = (action: string) => {
+    if (!isConnected()) return;
+    const summary = leadSummary();
+
+    switch (action) {
+      case 'research':
+        sendMessage(`Please research this lead from the "${formName}" form:\n\n${summary}\n\nFind information about this person/company online - LinkedIn, company website, news, etc.`);
+        break;
+      case 'crm':
+        sendMessage(`Please add this lead to my CRM:\n\n${summary}\n\nSource: ${formName} form\nDate: ${lead.created_at ? new Date(lead.created_at).toLocaleDateString() : 'Unknown'}`);
+        break;
+      case 'email':
+        sendMessage(`Please draft a follow-up email for this lead:\n\n${summary}\n\nThis lead came from the "${formName}" form. Draft a professional, personalized response.`);
+        break;
+      case 'summary':
+        sendMessage(`Here's a lead from the "${formName}" form:\n\n${summary}\n\nWhat would you like me to do with this lead?`);
+        break;
+    }
+    setShowActions(false);
+  };
+
+  const actionButtonStyle = {
+    padding: '6px 12px',
+    fontSize: 12,
+    fontWeight: 500,
+    border: 'none',
+    borderRadius: 6,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+  };
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600 }}>{lead.data?.name || lead.data?.email || `Lead #${index + 1}`}</div>
+          {lead.data?.email && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>✉️ {lead.data.email}</div>}
+          {lead.data?.phone && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>📱 {lead.data.phone}</div>}
+          {lead.data?.company && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>🏢 {lead.data.company}</div>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {lead.created_at && <div style={{ fontSize: 13, color: '#9ca3af' }}>{new Date(lead.created_at).toLocaleDateString()}</div>}
+          {isConnected() && (
+            <button
+              onClick={() => setShowActions(!showActions)}
+              style={{
+                padding: '6px 10px',
+                fontSize: 14,
+                background: showActions ? '#eef2ff' : '#f3f4f6',
+                color: showActions ? '#667eea' : '#6b7280',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+              title="AI Actions"
+            >
+              🤖
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* AI Action Buttons */}
+      {showActions && isConnected() && (
+        <div style={{
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: '1px solid #e5e7eb',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8
+        }}>
+          <button
+            onClick={() => handleAction('research')}
+            style={{ ...actionButtonStyle, background: '#dbeafe', color: '#1d4ed8' }}
+          >
+            🔍 Research
+          </button>
+          <button
+            onClick={() => handleAction('crm')}
+            style={{ ...actionButtonStyle, background: '#dcfce7', color: '#15803d' }}
+          >
+            📇 Add to CRM
+          </button>
+          <button
+            onClick={() => handleAction('email')}
+            style={{ ...actionButtonStyle, background: '#fef3c7', color: '#b45309' }}
+          >
+            ✉️ Draft Email
+          </button>
+          <button
+            onClick={() => handleAction('summary')}
+            style={{ ...actionButtonStyle, background: '#f3e8ff', color: '#7c3aed' }}
+          >
+            💬 Ask AI
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Dashboard
 function Dashboard() {
   const config = useConfig()!;
@@ -398,16 +522,7 @@ function Dashboard() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {leads.map((l, i) => (
-                      <div key={l.id || i} style={{ background: 'white', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{l.data?.name || l.data?.email || `Lead #${i + 1}`}</div>
-                            {l.data?.email && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>✉️ {l.data.email}</div>}
-                            {l.data?.phone && <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>📱 {l.data.phone}</div>}
-                          </div>
-                          {l.created_at && <div style={{ fontSize: 13, color: '#9ca3af' }}>{new Date(l.created_at).toLocaleDateString()}</div>}
-                        </div>
-                      </div>
+                      <LeadCard key={l.id || i} lead={l} index={i} formName={selectedFormName} />
                     ))}
                   </div>
                 )}
