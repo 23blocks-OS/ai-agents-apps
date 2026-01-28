@@ -51,6 +51,18 @@ const configJson = JSON.stringify({
   apiKey: API_KEY,
 });
 
+// CRITICAL: This message tells Claude to STOP and wait for user interaction
+// Without this, Claude sees JSON config and thinks it needs to take action
+const UI_DISPLAYED_MESSAGE = `✅ The Forms Dashboard UI is now displayed directly in this chat window.
+
+IMPORTANT: The user will interact with the UI embedded above - NOT a browser.
+- Do NOT use browser automation tools
+- Do NOT navigate to any websites
+- Do NOT call any other tools
+- Simply wait for the user to interact with the UI and respond to you
+
+The UI shows a login form. Once the user logs in, they can view and manage their forms directly in this embedded interface.`;
+
 /**
  * Creates the MCP server with tools and resources.
  */
@@ -71,9 +83,13 @@ export function createServer(): McpServer {
       _meta: { ui: { resourceUri: DASHBOARD_URI } },
     },
     async (): Promise<CallToolResult> => {
-      // Return config as JSON so the UI can receive it via ontoolresult
+      // First text block: human-readable message for Claude
+      // Second text block: JSON config for the UI (parsed silently)
       return {
-        content: [{ type: "text", text: configJson }],
+        content: [
+          { type: "text", text: UI_DISPLAYED_MESSAGE },
+          { type: "text", text: configJson },
+        ],
       };
     },
   );
@@ -90,7 +106,10 @@ export function createServer(): McpServer {
     },
     async (): Promise<CallToolResult> => {
       return {
-        content: [{ type: "text", text: configJson }],
+        content: [
+          { type: "text", text: UI_DISPLAYED_MESSAGE },
+          { type: "text", text: configJson },
+        ],
       };
     },
   );
@@ -108,7 +127,7 @@ export function createServer(): McpServer {
           form_id: { type: "string", description: "Form ID to view leads for" },
         },
         required: ["form_id"],
-      },
+      } as unknown as Record<string, never>,
       _meta: { ui: { resourceUri: DASHBOARD_URI } },
     },
     async (args: { form_id?: string }): Promise<CallToolResult> => {
@@ -120,7 +139,10 @@ export function createServer(): McpServer {
         formId: args.form_id,
       });
       return {
-        content: [{ type: "text", text: extendedConfig }],
+        content: [
+          { type: "text", text: UI_DISPLAYED_MESSAGE },
+          { type: "text", text: extendedConfig },
+        ],
       };
     },
   );

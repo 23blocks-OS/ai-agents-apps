@@ -35,18 +35,22 @@ export async function initMcpApp(): Promise<App> {
     console.log('[MCP] Tool result received:', result);
 
     // Extract config from tool result content
-    const textContent = result.content?.find((c: any) => c.type === 'text');
-    if (textContent?.text) {
-      try {
-        // Try to parse as JSON config
-        const parsed = JSON.parse(textContent.text);
-        if (parsed.apiUrl && parsed.authUrl && parsed.apiKey) {
-          config = parsed;
-          console.log('[MCP] Config received from tool result');
-          configListeners.forEach(l => l(config!));
+    // Search through all text content blocks to find the JSON config
+    const textContents = result.content?.filter((c: any) => c.type === 'text') || [];
+    for (const textContent of textContents) {
+      if (textContent?.text) {
+        try {
+          // Try to parse as JSON config
+          const parsed = JSON.parse(textContent.text);
+          if (parsed.apiUrl && parsed.authUrl && parsed.apiKey) {
+            config = parsed;
+            console.log('[MCP] Config received from tool result');
+            configListeners.forEach(l => l(config!));
+            break; // Found config, stop searching
+          }
+        } catch {
+          // Not JSON config, continue to next block
         }
-      } catch {
-        // Not JSON config, that's fine
       }
     }
 

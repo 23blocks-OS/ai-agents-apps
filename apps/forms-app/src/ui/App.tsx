@@ -72,7 +72,9 @@ function AuthProvider({ children, config }: { children: React.ReactNode; config:
         isLoading: false,
         error: null,
       });
-      if (isConnected()) sendMessage(`User logged in as ${email}`);
+      if (isConnected()) {
+        sendMessage(`User logged in successfully as ${email}. The Forms Dashboard is now displayed. I can interact with forms directly through this interface - do NOT use browser automation.`);
+      }
     } catch (err: any) {
       setState(s => ({ ...s, isLoading: false, error: err.message }));
     }
@@ -223,7 +225,10 @@ function Dashboard() {
         data: l.data || l.attributes?.data,
         created_at: l.created_at || l.attributes?.created_at
       })));
-      if (isConnected()) sendMessage(`Viewing ${data.data?.length || 0} leads for "${name}"`);
+      if (isConnected()) {
+        const leadCount = data.data?.length || 0;
+        sendMessage(`Now viewing ${leadCount} leads for form "${name}". The user can see the lead details in the dashboard.`);
+      }
     } catch (e) { console.error(e); }
     setLoadingLeads(false);
   };
@@ -247,7 +252,9 @@ function Dashboard() {
       setCreateData({ name: '', form_type: 'landing' });
       fetchForms();
       setView('leads');
-      if (isConnected()) sendMessage(`Created form: "${formName}"`);
+      if (isConnected()) {
+        sendMessage(`Successfully created new form: "${formName}". It now appears in the forms list.`);
+      }
     } catch (e) { console.error(e); }
     setCreating(false);
   };
