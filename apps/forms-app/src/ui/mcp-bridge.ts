@@ -7,13 +7,13 @@ import { App, applyDocumentTheme, applyHostStyleVariables } from '@modelcontextp
 let app: App | null = null;
 let connected = false;
 
-// Config received from tool result
-let config: { apiUrl: string; authUrl: string; apiKey: string } | null = null;
+// Config received from tool result (token is optional, passed when user already authenticated via auth-app)
+let config: { apiUrl: string; authUrl: string; apiKey: string; token?: string } | null = null;
 
 // Listeners for config updates
-const configListeners: ((config: { apiUrl: string; authUrl: string; apiKey: string }) => void)[] = [];
+const configListeners: ((config: { apiUrl: string; authUrl: string; apiKey: string; token?: string }) => void)[] = [];
 
-export function onConfigReceived(listener: (config: { apiUrl: string; authUrl: string; apiKey: string }) => void) {
+export function onConfigReceived(listener: (config: { apiUrl: string; authUrl: string; apiKey: string; token?: string }) => void) {
   configListeners.push(listener);
   // If config already received, call immediately
   if (config) {

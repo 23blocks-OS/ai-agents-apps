@@ -78,17 +78,32 @@ export function createServer(): McpServer {
     "forms_dashboard",
     {
       title: "Forms Dashboard",
-      description: "Open the 23blocks forms management dashboard. Login to view forms, leads, and create new forms.",
-      inputSchema: {},
+      description: "Open the 23blocks forms management dashboard. If the user already logged in via auth_login, pass the token parameter to skip login.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          token: { type: "string", description: "Auth token from auth_login (optional - pass if user already authenticated)" },
+        },
+      } as unknown as Record<string, never>,
       _meta: { ui: { resourceUri: DASHBOARD_URI } },
     },
-    async (): Promise<CallToolResult> => {
-      // First text block: human-readable message for Claude
-      // Second text block: JSON config for the UI (parsed silently)
+    async (args: { token?: string }): Promise<CallToolResult> => {
+      // Include token in config if provided
+      const config = {
+        apiUrl: API_URL,
+        authUrl: AUTH_URL,
+        apiKey: API_KEY,
+        ...(args.token && { token: args.token }),
+      };
+
+      const message = args.token
+        ? `✅ The Forms Dashboard UI is now displayed with pre-authenticated session.\n\nThe user should see their forms immediately without needing to login again.`
+        : UI_DISPLAYED_MESSAGE;
+
       return {
         content: [
-          { type: "text", text: UI_DISPLAYED_MESSAGE },
-          { type: "text", text: configJson },
+          { type: "text", text: message },
+          { type: "text", text: JSON.stringify(config) },
         ],
       };
     },

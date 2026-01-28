@@ -6,6 +6,7 @@ interface Config {
   apiUrl: string;
   authUrl: string;
   apiKey: string;
+  token?: string; // Optional pre-authenticated token from auth-app
 }
 
 interface AuthState {
@@ -70,17 +71,30 @@ function checkSharedToken(): { token: string; source: string } | null {
 // Auth Provider
 function AuthProvider({ children, config }: { children: React.ReactNode; config: Config }) {
   const [state, setState] = useState<AuthState>(() => {
-    // Check for shared token on initial load
-    const shared = checkSharedToken();
-    if (shared) {
+    // First check if token was passed via tool parameter (from Claude)
+    if (config.token) {
+      console.log('[Auth] Using token from tool parameter (Claude relay)');
       return {
-        token: shared.token,
-        user: { email: 'shared-auth' },
+        token: config.token,
+        user: { email: 'claude-relay-auth' },
         isAuthenticated: true,
         isLoading: false,
         error: null,
       };
     }
+
+    // Then check for shared token in storage (likely won't work cross-origin)
+    const shared = checkSharedToken();
+    if (shared) {
+      return {
+        token: shared.token,
+        user: { email: `${shared.source}-auth` },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      };
+    }
+
     return {
       token: null,
       user: null,
