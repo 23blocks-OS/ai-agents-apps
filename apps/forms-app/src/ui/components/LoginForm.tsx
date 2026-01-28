@@ -1,15 +1,33 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@23blocks/react';
 
-export function LoginForm() {
+interface LoginFormProps {
+  onLoginSuccess?: () => void;
+}
+
+export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading, error, clearError } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    await login(email, password);
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await signIn({ email, password });
+      // Notify parent that login was successful
+      onLoginSuccess?.();
+    } catch (err: any) {
+      setError(err?.message || 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -56,7 +74,7 @@ export function LoginForm() {
               <span>{error}</span>
               <button
                 type="button"
-                onClick={clearError}
+                onClick={() => setError(null)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -98,8 +116,6 @@ export function LoginForm() {
                 transition: 'border-color 0.2s',
                 boxSizing: 'border-box',
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
             />
           </div>
 
@@ -130,8 +146,6 @@ export function LoginForm() {
                 transition: 'border-color 0.2s',
                 boxSizing: 'border-box',
               }}
-              onFocus={(e) => e.target.style.borderColor = '#667eea'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
             />
           </div>
 
@@ -151,21 +165,7 @@ export function LoginForm() {
               transition: 'background 0.2s',
             }}
           >
-            {isLoading ? (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <span style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid white',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }} />
-                Signing in...
-              </span>
-            ) : (
-              'Sign In'
-            )}
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
@@ -178,12 +178,6 @@ export function LoginForm() {
           23blocks Forms Dashboard
         </p>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
