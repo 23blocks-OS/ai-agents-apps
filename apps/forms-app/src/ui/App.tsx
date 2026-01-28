@@ -535,21 +535,41 @@ function Dashboard() {
   );
 }
 
+// Check for standalone dev mode via URL params or env
+function getDevConfig(): Config | null {
+  // Check URL params: ?dev=true&apiUrl=...&authUrl=...&apiKey=...
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('dev') === 'true') {
+      const apiUrl = params.get('apiUrl') || import.meta.env.VITE_API_URL;
+      const authUrl = params.get('authUrl') || import.meta.env.VITE_AUTH_URL;
+      const apiKey = params.get('apiKey') || import.meta.env.VITE_API_KEY;
+      if (apiUrl && authUrl && apiKey) {
+        console.log('[App] Running in standalone dev mode');
+        return { apiUrl, authUrl, apiKey };
+      }
+    }
+  }
+  return null;
+}
+
 // Main App
 export default function App() {
-  const [config, setConfig] = useState<Config | null>(getConfig());
+  const [config, setConfig] = useState<Config | null>(getDevConfig() || getConfig());
 
   useEffect(() => {
-    // Listen for config from tool result
-    onConfigReceived((newConfig) => {
-      console.log('[App] Config received:', newConfig);
-      setConfig(newConfig);
-    });
+    // Listen for config from tool result (only if not in dev mode)
+    if (!getDevConfig()) {
+      onConfigReceived((newConfig) => {
+        console.log('[App] Config received:', newConfig);
+        setConfig(newConfig);
+      });
+    }
   }, []);
 
   // If no config yet, show loading (waiting for tool result)
   if (!config) {
-    return <LoadingSpinner message="Connecting..." />;
+    return <LoadingSpinner message="Connecting... (add ?dev=true&apiUrl=...&authUrl=...&apiKey=... for standalone testing)" />;
   }
 
   return (
