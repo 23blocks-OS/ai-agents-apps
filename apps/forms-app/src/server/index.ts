@@ -21,6 +21,20 @@ if (!API_URL || !API_KEY || !AUTH_URL) {
   process.exit(1);
 }
 
+// Extract origins from URLs for CSP connect-src
+function getOrigin(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return url;
+  }
+}
+
+const API_ORIGIN = getOrigin(API_URL);
+const AUTH_ORIGIN = getOrigin(AUTH_URL);
+const CSP_CONNECT_DOMAINS = [...new Set([API_ORIGIN, AUTH_ORIGIN])];
+
 // Path to the built UI HTML file
 // Works both from source (server/index.ts) and compiled (dist/server/index.js)
 const DIST_DIR = import.meta.filename?.endsWith(".ts")
@@ -112,6 +126,7 @@ export function createServer(): McpServer {
   );
 
   // Register the UI resource - serves the built HTML file
+  // Include CSP configuration to allow fetch to 23blocks APIs
   registerAppResource(
     server,
     DASHBOARD_URI,
@@ -126,6 +141,14 @@ export function createServer(): McpServer {
             uri: DASHBOARD_URI,
             mimeType: RESOURCE_MIME_TYPE,
             text: html,
+            _meta: {
+              ui: {
+                csp: {
+                  // Allow fetch/XHR to 23blocks APIs
+                  connectDomains: CSP_CONNECT_DOMAINS,
+                },
+              },
+            },
           }],
         };
       } catch (err) {
