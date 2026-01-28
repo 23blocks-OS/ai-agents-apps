@@ -40,15 +40,89 @@ const AuthContext = createContext<{
 } | null>(null);
 const useAuth = () => useContext(AuthContext);
 
+// Check for shared auth token from auth-app
+function checkSharedToken(): { token: string; source: string } | null {
+  // Try localStorage first
+  try {
+    const token = localStorage.getItem('23blocks_auth_token');
+    if (token) {
+      console.log('[Auth] Found shared token in localStorage');
+      return { token, source: 'localStorage' };
+    }
+  } catch (e) {
+    console.log('[Auth] localStorage not available');
+  }
+
+  // Try sessionStorage
+  try {
+    const token = sessionStorage.getItem('23blocks_auth_token');
+    if (token) {
+      console.log('[Auth] Found shared token in sessionStorage');
+      return { token, source: 'sessionStorage' };
+    }
+  } catch (e) {
+    console.log('[Auth] sessionStorage not available');
+  }
+
+  return null;
+}
+
 // Auth Provider
 function AuthProvider({ children, config }: { children: React.ReactNode; config: Config }) {
-  const [state, setState] = useState<AuthState>({
-    token: null,
-    user: null,
-    isAuthenticated: false,
-    isLoading: false,
-    error: null,
+  const [state, setState] = useState<AuthState>(() => {
+    // Check for shared token on initial load
+    const shared = checkSharedToken();
+    if (shared) {
+      return {
+        token: shared.token,
+        user: { email: 'shared-auth' },
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      };
+    }
+    return {
+      token: null,
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    };
   });
+
+  // Listen for BroadcastChannel messages from auth-app
+  useEffect(() => {
+    try {
+      const channel = new BroadcastChannel('23blocks_auth');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'auth_token' && event.data?.token) {
+          console.log('[Auth] Received token via BroadcastChannel');
+          setState({
+            token: event.data.token,
+            user: { email: 'broadcast-auth' },
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          });
+          if (isConnected()) {
+            sendMessage('Received authentication token from auth-app via BroadcastChannel. User is now logged in.');
+          }
+        }
+      };
+      return () => channel.close();
+    } catch (e) {
+      console.log('[Auth] BroadcastChannel not available');
+    }
+  }, []);
+
+  // Notify if we found a shared token
+  useEffect(() => {
+    if (state.isAuthenticated && state.user?.email?.includes('-auth')) {
+      if (isConnected()) {
+        sendMessage(`Forms Dashboard: Found shared authentication token (source: ${state.user.email}). User is already logged in - no login required!`);
+      }
+    }
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }));
